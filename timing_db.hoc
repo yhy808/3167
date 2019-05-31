@@ -1,0 +1,140 @@
+load_file("nrngui.hoc")
+cvode.active(1)
+
+Rm = 10000
+CmSoma= 1
+RaSoma=150  
+
+Vrest = -65
+dt = 0.05
+gna =  .015
+gkdr = 0.002
+celsius = 34.0  
+ka = 0.025
+gavre=1.
+gdeve=0. 
+gavri=0.15
+gdevi=0.0
+sd=0
+
+tstop=1000
+
+objref nc, nci, g, b, rsyn, rsyni, apc
+
+create soma, apical
+connect soma(1), apical(0)
+access soma
+
+apc = new APCount(0.5)
+apc.thresh=0
+
+apical {
+	rsyn = new pnoise(0.1)
+	rsyni = new pnoise(0.1)
+	nc = new NetCon(rsyn,rsyn)
+	nci = new NetCon(rsyni,rsyni)
+}
+
+b = new VBox()
+b.intercept(1)
+g = new Graph()
+g.size(0,tstop,-70,30)
+g.addvar("soma.v(0.5)",2,1, 2*tstop,0,2)
+g.color(1)
+g.label(0.3,0.9,"production of a 0.5 sec interval")
+g.xaxis(1)
+g.begin()
+xpanel("")
+xbutton("run", "runu()")
+xvalue("inhibition","gavri")
+xpanel()
+b.intercept(0)
+b.map()
+
+meant=50
+rsyn.e=0
+rsyn.alp=2.4
+rsyn.eps=3   
+rsyn.bet=1    
+rsyn.count=0  
+rsyn.start=0
+rsyn.gavr=gavre
+rsyn.meant=meant
+rsyn.type=-1
+rsyn.sd=sd
+
+meanti=25
+rsyni.e=-80   
+rsyni.alp=3.5
+rsyni.eps=20
+rsyni.bet=1
+rsyni.count=0
+rsyni.start=0
+rsyni.meant=meanti
+rsyni.rfreq=0
+rsyni.type=-1
+rsyni.sd=0
+
+soma {        L=10 diam=10 nseg=1
+              insert na3  gbar_na3=gna ar2_na3=1
+              insert kdr gkdrbar_kdr=gkdr 
+              insert kap gkabar_kap = ka
+              insert pas e_pas=Vrest g_pas = 1/Rm Ra=RaSoma cm=CmSoma
+}
+apical {      L=400 diam=1 nseg=10
+              insert na3  gbar_na3=gna ar2_na3=1
+              insert kdr gkdrbar_kdr=gkdr 
+              insert kap gkabar_kap = ka
+              insert pas e_pas=Vrest g_pas = 1/Rm Ra=RaSoma cm=CmSoma
+}
+
+proc init() {
+	t=0
+        forall {
+        v=Vrest
+	ena=55
+	ek=-90
+	}
+	finitialize(v)
+        fcurrent()
+        forall {e_pas=v+(ina+ik)/g_pas}
+	nc.event(0)
+	nci.event(0)
+	cvode.re_init()
+}
+
+proc step() {
+	fadvance()
+	g.plot(t)
+	g.flush()
+	doNotify()
+}
+
+proc run() {
+	g.begin()
+	init()
+	while(apc.n<5 && t<tstop) { step()}
+}
+
+
+proc runu() {
+	print " production of a 0.5 sec interval"
+	sum=0
+	k=0
+	for i=0,4 {
+	t=0
+	rsyn.rfreq=0
+	rsyni.gavr=gavri
+	run()
+	if (t<tstop) {
+		k=k+1
+		print " subject n. ",i+1," produced ",t/1000, " sec"
+		sum=sum+t/1000
+		} else {
+		print " subject n. ",i+1,": simulation time too short "
+	}
+	}
+	print " average interval produced: ",sum/k, " sec"
+}
+
+
